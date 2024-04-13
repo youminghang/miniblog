@@ -19,8 +19,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/marmotedu/miniblog/internal/pkg/core"
-	"github.com/marmotedu/miniblog/internal/pkg/errno"
 	"github.com/marmotedu/miniblog/internal/pkg/log"
 	mw "github.com/marmotedu/miniblog/internal/pkg/middleware"
 	"github.com/marmotedu/miniblog/pkg/version/verflag"
@@ -85,6 +83,11 @@ Find more miniblog information at:
 
 // run 函数是实际的业务代码入口函数.
 func run() error {
+	// 初始化 store 层
+	if err := initStore(); err != nil {
+		return err
+	}
+
 	// 设置 Gin 模式
 	gin.SetMode(viper.GetString("runmode"))
 
@@ -96,17 +99,9 @@ func run() error {
 
 	g.Use(mws...)
 
-	// 注册 404 Handler.
-	g.NoRoute(func(c *gin.Context) {
-		core.WriteResponse(c, errno.ErrPageNotFound, nil)
-	})
-
-	// 注册 /healthz handler.
-	g.GET("/healthz", func(c *gin.Context) {
-		log.C(c).Infow("Healthz function called")
-
-		core.WriteResponse(c, nil, map[string]string{"status": "ok"})
-	})
+	if err := installRouters(g); err != nil {
+		return err
+	}
 
 	// 创建 HTTP Server 实例
 	httpsrv := &http.Server{Addr: viper.GetString("addr"), Handler: g}
